@@ -1,40 +1,48 @@
 #pragma once
+#include <condition_variable>
+#include <cstdarg>
+#include <functional>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <vector>
-#include <cstdarg>
-#include <functional>
-#include <condition_variable>
 
 namespace csp {
   template <class TItem>
   class Channel {
    private:
     std::queue<TItem> queue;
+    unsigned int state = 0;
     std::mutex m;
     std::condition_variable cv;
-    unsigned int buffer;
 
    public:
-    Channel() : buffer(0) {}
-    Channel(unsigned int n) : buffer(n) {}
+    Channel() {}
 
     void put(TItem t) {
       std::unique_lock<std::mutex> lock(m);
 
+      cv.wait(lock, [&]() { return (state == 0); });
+
       queue.push(t);
-      cv.notify_one();
-      cv.wait(lock, [&]() { return queue.size() < this->buffer + 1; });
+      state = 1;
+      cv.notify_all();
+
+      cv.wait(lock, [&]() { return (state == 2); });
+
+      state = 0;
+      cv.notify_all();
     }
 
     TItem get() {
       std::unique_lock<std::mutex> lock(m);
-      cv.wait(lock, [&]() { return !queue.empty(); });
+      cv.wait(lock, [&]() { return (state == 1); });
 
       TItem e = queue.front();
       queue.pop();
-      cv.notify_one();
+      state = 2;
+      cv.notify_all();
+
       return e;
     }
 
@@ -89,4 +97,4 @@ namespace csp {
       for (auto thread : threads) delete thread;
     }
   };
-}
+} // namespace csp
