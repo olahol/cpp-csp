@@ -3,7 +3,7 @@
 
 int main() {
   csp::Scheduler scheduler;
-  csp::Channel<int> ch1(10), ch2(0);
+  csp::Channel<int> ch1, ch2;
 
   scheduler.spawn([&]() {
     std::chrono::milliseconds dura(100);
